@@ -14,7 +14,9 @@ import {
   Activity,
   User,
   Printer,
-  Send
+  Send,
+  Menu,
+  X
 } from 'lucide-react'
 import { Auth } from './components/Auth'
 import { PatientModal } from './components/PatientModal'
@@ -39,6 +41,7 @@ function App() {
   const [activeView, setActiveView] = useState<'dashboard' | 'pacientes'>('dashboard')
   const [selectedPatient, setSelectedPatient] = useState<PacienteComConsultas | null>(null)
   const [profileTab, setProfileTab] = useState<'consultas' | 'planos'>('consultas')
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   
   // Estados para edição
   const [patientToEdit, setPatientToEdit] = useState<PacienteComConsultas | null>(null)
@@ -793,11 +796,44 @@ function App() {
 
   return (
     <div className="app-container">
-      {/* Sidebar Fixo */}
-      <aside className="sidebar">
+      {/* Header Mobile para telas menores */}
+      <header className="mobile-header no-print">
+        <button 
+          className="menu-toggle" 
+          onClick={() => setIsSidebarOpen(true)}
+          aria-label="Abrir menu"
+        >
+          <Menu size={24} />
+        </button>
+        <div className="mobile-logo">
+          <div className="logo-icon small">JL</div>
+          <span className="logo-text small">nutrido JL</span>
+        </div>
+        <div style={{ width: 40 }}></div>
+      </header>
+
+      {/* Overlay desfocado ao abrir a sidebar no mobile */}
+      {isSidebarOpen && (
+        <div 
+          className="sidebar-overlay no-print" 
+          onClick={() => setIsSidebarOpen(false)}
+        ></div>
+      )}
+
+      {/* Sidebar Fixo / Deslizante no Mobile */}
+      <aside className={`sidebar ${isSidebarOpen ? 'open' : ''}`}>
         <div className="logo-container">
-          <div className="logo-icon">JL</div>
-          <span className="logo-text">nutrido JL</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="logo-icon">JL</div>
+            <span className="logo-text">nutrido JL</span>
+          </div>
+          <button 
+            className="sidebar-close-btn" 
+            onClick={() => setIsSidebarOpen(false)}
+            aria-label="Fechar menu"
+          >
+            <X size={20} />
+          </button>
         </div>
         
         <nav className="nav-menu">
@@ -806,6 +842,7 @@ function App() {
             onClick={() => {
               setActiveView('dashboard')
               setSelectedPatient(null)
+              setIsSidebarOpen(false)
             }}
           >
             <LayoutDashboard size={20} />
@@ -816,13 +853,20 @@ function App() {
             onClick={() => {
               setActiveView('pacientes')
               setSelectedPatient(null)
+              setIsSidebarOpen(false)
             }}
           >
             <Users size={20} />
             <span>Pacientes</span>
           </button>
           <div className="nav-spacer"></div>
-          <button className="nav-item" onClick={handleLogout}>
+          <button 
+            className="nav-item" 
+            onClick={() => {
+              handleLogout()
+              setIsSidebarOpen(false)
+            }}
+          >
             <LogOut size={20} />
             <span>Sair</span>
           </button>
