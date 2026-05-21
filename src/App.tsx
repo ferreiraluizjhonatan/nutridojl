@@ -49,6 +49,7 @@ function App() {
   const [planText, setPlanText] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [consultaToEdit, setConsultaToEdit] = useState<Consulta | null>(null)
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
 
 
   useEffect(() => {
@@ -60,8 +61,11 @@ function App() {
     })
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsResettingPassword(true)
+      }
       if (session) fetchPacientes()
       else {
         setPacientes([])
@@ -435,8 +439,8 @@ function App() {
     )
   }
 
-  if (!session) {
-    return <Auth />
+  if (!session || isResettingPassword) {
+    return <Auth isResettingPassword={isResettingPassword} onPasswordResetComplete={() => setIsResettingPassword(false)} />
   }
 
   const renderPatientProfile = () => {
