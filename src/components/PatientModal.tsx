@@ -303,9 +303,9 @@ export function PatientModal({ isOpen, onClose, onSuccess, patientToEdit }: Pati
                   
                   <div className="form-group full-width">
                     <label>Objetivo</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                    <div className="checkbox-pill-group">
                       {OBJETIVOS_OPCOES.map(opt => (
-                        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', background: 'var(--bg-main)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                        <label key={opt} className={`checkbox-pill${formData.objetivos?.includes(opt) ? ' checked' : ''}`}>
                           <input type="checkbox" checked={formData.objetivos?.includes(opt)} onChange={(e) => handleArrayChange('objetivos', opt, e.target.checked)} /> {opt}
                         </label>
                       ))}
@@ -315,12 +315,12 @@ export function PatientModal({ isOpen, onClose, onSuccess, patientToEdit }: Pati
 
                   <div className="form-group full-width">
                     <label>Patologias ou Condições de Saúde</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', background: 'var(--bg-main)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                    <div className="checkbox-pill-group">
+                      <label className={`checkbox-pill${formData.patologias?.includes('Nenhum') ? ' checked' : ''}`}>
                         <input type="checkbox" checked={formData.patologias?.includes('Nenhum')} onChange={(e) => handleArrayChange('patologias', 'Nenhum', e.target.checked)} /> Nenhum
                       </label>
                       {PATOLOGIAS_OPCOES.map(opt => (
-                        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', background: 'var(--bg-main)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                        <label key={opt} className={`checkbox-pill${formData.patologias?.includes(opt) ? ' checked' : ''}${formData.patologias?.includes('Nenhum') ? ' disabled' : ''}`}>
                           <input type="checkbox" disabled={formData.patologias?.includes('Nenhum')} checked={formData.patologias?.includes(opt)} onChange={(e) => handleArrayChange('patologias', opt, e.target.checked)} /> {opt}
                         </label>
                       ))}
@@ -330,12 +330,12 @@ export function PatientModal({ isOpen, onClose, onSuccess, patientToEdit }: Pati
 
                   <div className="form-group full-width">
                     <label>Restrições Alimentares</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', background: 'var(--bg-main)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                    <div className="checkbox-pill-group">
+                      <label className={`checkbox-pill${formData.restricoes_alimentares?.includes('Nenhum') ? ' checked' : ''}`}>
                         <input type="checkbox" checked={formData.restricoes_alimentares?.includes('Nenhum')} onChange={(e) => handleArrayChange('restricoes_alimentares', 'Nenhum', e.target.checked)} /> Nenhum
                       </label>
                       {RESTRICOES_OPCOES.map(opt => (
-                        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', background: 'var(--bg-main)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                        <label key={opt} className={`checkbox-pill${formData.restricoes_alimentares?.includes(opt) ? ' checked' : ''}${formData.restricoes_alimentares?.includes('Nenhum') ? ' disabled' : ''}`}>
                           <input type="checkbox" disabled={formData.restricoes_alimentares?.includes('Nenhum')} checked={formData.restricoes_alimentares?.includes(opt)} onChange={(e) => handleArrayChange('restricoes_alimentares', opt, e.target.checked)} /> {opt}
                         </label>
                       ))}
@@ -345,12 +345,12 @@ export function PatientModal({ isOpen, onClose, onSuccess, patientToEdit }: Pati
 
                   <div className="form-group full-width">
                     <label>Alergias Alimentares</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', background: 'var(--bg-main)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                    <div className="checkbox-pill-group">
+                      <label className={`checkbox-pill${formData.alergias?.includes('Nenhum') ? ' checked' : ''}`}>
                         <input type="checkbox" checked={formData.alergias?.includes('Nenhum')} onChange={(e) => handleArrayChange('alergias', 'Nenhum', e.target.checked)} /> Nenhum
                       </label>
                       {ALERGIAS_OPCOES.map(opt => (
-                        <label key={opt} style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', background: 'var(--bg-main)', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                        <label key={opt} className={`checkbox-pill${formData.alergias?.includes(opt) ? ' checked' : ''}${formData.alergias?.includes('Nenhum') ? ' disabled' : ''}`}>
                           <input type="checkbox" disabled={formData.alergias?.includes('Nenhum')} checked={formData.alergias?.includes(opt)} onChange={(e) => handleArrayChange('alergias', opt, e.target.checked)} /> {opt}
                         </label>
                       ))}
