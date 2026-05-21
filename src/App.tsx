@@ -40,7 +40,9 @@ function App() {
   const [isConsultationModalOpen, setIsConsultationModalOpen] = useState(false)
   const [activeView, setActiveView] = useState<'dashboard' | 'pacientes'>('dashboard')
   const [selectedPatient, setSelectedPatient] = useState<PacienteComConsultas | null>(null)
-  const [profileTab, setProfileTab] = useState<'consultas' | 'planos'>('consultas')
+  const [profileTab, setProfileTab] = useState<'dados' | 'consultas' | 'planos'>('dados')
+  const [dataSubTab, setDataSubTab] = useState<'pessoal' | 'clinico' | 'habitos'>('pessoal')
+  const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   
   // Estados para edição
@@ -452,11 +454,18 @@ function App() {
     if (!selectedPatient) return null;
     const p = selectedPatient;
 
+    const calcIMC = () => {
+      if (p.peso_inicial && p.altura) {
+        return (p.peso_inicial / Math.pow(p.altura / 100, 2)).toFixed(1);
+      }
+      return null;
+    };
+
     return (
       <div className="profile-container">
         <header className="profile-header">
           <div className="profile-title-wrapper">
-            <button className="btn-back" style={{ width: 'fit-content', marginBottom: '12px' }} onClick={() => setSelectedPatient(null)}>
+            <button className="btn-back" style={{ width: 'fit-content', marginBottom: '12px' }} onClick={() => { setSelectedPatient(null); setProfileTab('dados'); setDataSubTab('pessoal'); }}>
               <ArrowLeft size={16} /> Voltar
             </button>
             <h1>{p.nome}</h1>
@@ -475,330 +484,455 @@ function App() {
           </button>
         </header>
 
-        <div className="profile-layout">
-          {/* Sidebar de Informações do Paciente */}
-          <div className="profile-sidebar">
-            <div className="profile-card">
-              <h3 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><User size={16} /> Dados Cadastrais</span>
-                <button 
-                  className="btn-ghost" 
-                  style={{ padding: '2px 8px', fontSize: '12px', color: 'var(--success-green)', fontWeight: 600 }}
-                  onClick={() => {
-                    setPatientToEdit(p);
-                    setIsModalOpen(true);
-                  }}
-                >
-                  Editar
+        {/* 3 Abas principais: Dados / Consultas / Planos */}
+        <div className="profile-tabs">
+          <button 
+            className={`profile-tab ${profileTab === 'dados' ? 'active' : ''}`}
+            onClick={() => setProfileTab('dados')}
+          >
+            <User size={16} /> Dados do Paciente
+          </button>
+          <button 
+            className={`profile-tab ${profileTab === 'consultas' ? 'active' : ''}`}
+            onClick={() => setProfileTab('consultas')}
+          >
+            <Calendar size={16} /> Consultas
+          </button>
+          <button 
+            className={`profile-tab ${profileTab === 'planos' ? 'active' : ''}`}
+            onClick={() => setProfileTab('planos')}
+          >
+            <Utensils size={16} /> Planos Alimentares
+          </button>
+        </div>
+
+        {/* ===== SEÇÃO 1 — DADOS DO PACIENTE ===== */}
+        {profileTab === 'dados' && (
+          <div className="profile-data-section">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+              <div className="data-sub-tabs">
+                <button className={`data-sub-tab ${dataSubTab === 'pessoal' ? 'active' : ''}`} onClick={() => setDataSubTab('pessoal')}>
+                  <User size={14} /> Pessoal
                 </button>
-              </h3>
-              <div className="profile-info-list">
-                <div className="profile-info-item">
-                  <span className="profile-info-label">E-mail</span>
-                  <span className="profile-info-value">{p.email || '-'}</span>
-                </div>
-                <div className="profile-info-item">
-                  <span className="profile-info-label">WhatsApp / Tel</span>
-                  <span className="profile-info-value">{p.whatsapp || p.telefone || '-'}</span>
-                </div>
-                <div className="profile-info-item">
-                  <span className="profile-info-label">Data de Nascimento</span>
-                  <span className="profile-info-value">
-                    {p.data_nascimento ? new Date(p.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                  </span>
-                </div>
-                <div className="profile-info-item">
-                  <span className="profile-info-label">Idade</span>
-                  <span className="profile-info-value">{calcularIdade(p.data_nascimento)}</span>
-                </div>
-                <div className="profile-info-item">
-                  <span className="profile-info-label">Sexo</span>
-                  <span className="profile-info-value">{p.sexo || '-'}</span>
-                </div>
+                <button className={`data-sub-tab ${dataSubTab === 'clinico' ? 'active' : ''}`} onClick={() => setDataSubTab('clinico')}>
+                  <Activity size={14} /> Clínico
+                </button>
+                <button className={`data-sub-tab ${dataSubTab === 'habitos' ? 'active' : ''}`} onClick={() => setDataSubTab('habitos')}>
+                  <Clock size={14} /> Hábitos
+                </button>
               </div>
+              <button 
+                className="btn-primary flex items-center gap-2" 
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+                onClick={() => { setPatientToEdit(p); setIsModalOpen(true); }}
+              >
+                Editar Dados
+              </button>
             </div>
 
-            <div className="profile-card">
-              <h3 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Activity size={16} /> Estilo de Vida</span>
-                <button 
-                  className="btn-ghost" 
-                  style={{ padding: '2px 8px', fontSize: '12px', color: 'var(--success-green)', fontWeight: 600 }}
-                  onClick={() => {
-                    setPatientToEdit(p);
-                    setIsModalOpen(true);
-                  }}
-                >
-                  Editar
-                </button>
-              </h3>
-              <div className="profile-info-list">
-                <div className="profile-info-item">
-                  <span className="profile-info-label">Nível de Atividade</span>
-                  <span className="profile-info-value">{p.nivel_atividade || 'Sedentário'}</span>
-                </div>
-                <div className="profile-info-item">
-                  <span className="profile-info-label">Água Diária</span>
-                  <span className="profile-info-value">{p.litros_agua ? `${p.litros_agua} Litros` : '-'}</span>
-                </div>
-                <div className="profile-info-item">
-                  <span className="profile-info-label">Refeições por Dia</span>
-                  <span className="profile-info-value">{p.refeicoes_por_dia || '-'}</span>
-                </div>
-                <div className="profile-info-item">
-                  <span className="profile-info-label">Pratica Exercício?</span>
-                  <span className="profile-info-value">{p.atividade_fisica ? 'Sim' : 'Não'}</span>
-                </div>
-                {p.atividade_fisica_descricao && (
+            {dataSubTab === 'pessoal' && (
+              <div className="profile-card fade-in">
+                <div className="profile-info-grid">
                   <div className="profile-info-item">
-                    <span className="profile-info-label">Exercício Detalhes</span>
-                    <span className="profile-info-value">{p.atividade_fisica_descricao}</span>
+                    <span className="profile-info-label">Nome Completo</span>
+                    <span className="profile-info-value">{p.nome}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">E-mail</span>
+                    <span className="profile-info-value">{p.email || '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Telefone</span>
+                    <span className="profile-info-value">{p.telefone || '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">WhatsApp</span>
+                    <span className="profile-info-value">{p.whatsapp || '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Data de Nascimento</span>
+                    <span className="profile-info-value">{p.data_nascimento ? new Date(p.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Idade</span>
+                    <span className="profile-info-value">{calcularIdade(p.data_nascimento)}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Sexo</span>
+                    <span className="profile-info-value">{p.sexo || '-'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {dataSubTab === 'clinico' && (
+              <div className="profile-card fade-in">
+                <div className="profile-info-grid">
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Peso Inicial</span>
+                    <span className="profile-info-value">{p.peso_inicial ? `${p.peso_inicial} kg` : '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Altura</span>
+                    <span className="profile-info-value">{p.altura ? `${p.altura} cm` : '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">IMC</span>
+                    <span className="profile-info-value">{calcIMC() || '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Nível de Atividade</span>
+                    <span className="profile-info-value">{p.nivel_atividade || '-'}</span>
+                  </div>
+                </div>
+
+                <div className="profile-info-block">
+                  <span className="profile-info-label">Objetivos</span>
+                  <div className="profile-tags">
+                    {p.objetivos && p.objetivos.length > 0 
+                      ? p.objetivos.map((o, i) => <span key={i} className="profile-tag">{o}</span>)
+                      : <span className="profile-info-value">-</span>
+                    }
+                  </div>
+                  {p.objetivo_texto && <p className="profile-info-value" style={{ marginTop: '4px' }}>{p.objetivo_texto}</p>}
+                </div>
+
+                <div className="profile-info-block">
+                  <span className="profile-info-label">Patologias</span>
+                  <div className="profile-tags">
+                    {p.patologias && p.patologias.length > 0 
+                      ? p.patologias.map((pt, i) => <span key={i} className="profile-tag tag-warning">{pt}</span>)
+                      : <span className="profile-info-value">Nenhuma</span>
+                    }
+                  </div>
+                </div>
+
+                <div className="profile-info-block">
+                  <span className="profile-info-label">Restrições Alimentares</span>
+                  <div className="profile-tags">
+                    {p.restricoes_alimentares && p.restricoes_alimentares.length > 0 
+                      ? p.restricoes_alimentares.map((r, i) => <span key={i} className="profile-tag tag-orange">{r}</span>)
+                      : <span className="profile-info-value">Nenhuma</span>
+                    }
+                  </div>
+                </div>
+
+                <div className="profile-info-block">
+                  <span className="profile-info-label">Alergias</span>
+                  <div className="profile-tags">
+                    {p.alergias && p.alergias.length > 0 
+                      ? p.alergias.map((a, i) => <span key={i} className="profile-tag tag-red">{a}</span>)
+                      : <span className="profile-info-value">Nenhuma</span>
+                    }
+                  </div>
+                </div>
+
+                <div className="profile-info-grid" style={{ marginTop: '16px' }}>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Medicamentos</span>
+                    <span className="profile-info-value">{p.medicamentos || '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Suplementos</span>
+                    <span className="profile-info-value">{p.suplementos || '-'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {dataSubTab === 'habitos' && (
+              <div className="profile-card fade-in">
+                <div className="profile-info-grid">
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Refeições por Dia</span>
+                    <span className="profile-info-value">{p.refeicoes_por_dia || '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Água (Litros/dia)</span>
+                    <span className="profile-info-value">{p.litros_agua ? `${p.litros_agua} L` : '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Horário que Acorda</span>
+                    <span className="profile-info-value">{p.horario_acorda || '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Horário que Dorme</span>
+                    <span className="profile-info-value">{p.horario_dorme || '-'}</span>
+                  </div>
+                  <div className="profile-info-item">
+                    <span className="profile-info-label">Pratica Atividade Física?</span>
+                    <span className="profile-info-value">{p.atividade_fisica ? 'Sim' : 'Não'}</span>
+                  </div>
+                  {p.atividade_fisica_descricao && (
+                    <div className="profile-info-item">
+                      <span className="profile-info-label">Detalhes da Atividade</span>
+                      <span className="profile-info-value">{p.atividade_fisica_descricao}</span>
+                    </div>
+                  )}
+                </div>
+                {p.observacoes && (
+                  <div className="profile-info-block" style={{ marginTop: '16px' }}>
+                    <span className="profile-info-label">Observações Gerais</span>
+                    <p className="profile-info-value" style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{p.observacoes}</p>
                   </div>
                 )}
               </div>
-            </div>
+            )}
           </div>
+        )}
 
-          {/* Área Principal - Histórico e Planos */}
-          <div className="profile-main-content">
-            <div className="profile-tabs">
-              <button 
-                className={`profile-tab ${profileTab === 'consultas' ? 'active' : ''}`}
-                onClick={() => setProfileTab('consultas')}
-              >
-                Histórico de Consultas
-              </button>
-              <button 
-                className={`profile-tab ${profileTab === 'planos' ? 'active' : ''}`}
-                onClick={() => setProfileTab('planos')}
-              >
-                Planos Alimentares
-              </button>
-            </div>
+        {/* ===== SEÇÃO 2 — CONSULTAS ===== */}
+        {profileTab === 'consultas' && (
+          <div className="consultations-timeline">
+            {/* Gráfico SEMPRE visível */}
+            {(() => {
+              const consultas = p.consultas || [];
+              const validConsultas = consultas.filter(c => c.peso !== null).sort((a, b) => a.data_consulta.localeCompare(b.data_consulta));
+              
+              if (validConsultas.length < 2) {
+                return (
+                  <div className="chart-container" style={{ margin: '0 0 24px 0', padding: '20px', backgroundColor: 'var(--bg-sidebar)', borderRadius: '12px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
+                    <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: 'var(--success-green)', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                      <Activity size={18} /> Evolução de Peso
+                    </h4>
+                    <div style={{ padding: '30px 0', color: 'var(--text-muted)', fontSize: '14px' }}>
+                      <Calendar size={32} style={{ marginBottom: '8px', opacity: 0.4 }} />
+                      <p style={{ margin: 0 }}>
+                        {consultas.length === 0 
+                          ? 'Nenhuma consulta registrada ainda' 
+                          : 'Registre pelo menos 2 consultas com peso para visualizar a evolução'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
 
-            {profileTab === 'consultas' && (
-              <div className="consultations-timeline">
-                {p.consultas && p.consultas.length > 0 && renderEvolucaoChart(p.consultas)}
-                {p.consultas && p.consultas.length > 0 ? (
-                  [...p.consultas]
-                    .sort((a, b) => b.data_consulta.localeCompare(a.data_consulta))
-                    .map(c => {
-                      const bmi = p.altura && c.peso 
-                        ? (c.peso / Math.pow(p.altura / 100, 2)).toFixed(1)
-                        : null;
-                      return (
-                        <div key={c.id} className="timeline-item">
-                          <div className="timeline-card">
-                            <div className="timeline-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                                <span className="timeline-date">
-                                  Consulta em {new Date(c.data_consulta + 'T00:00:00').toLocaleDateString('pt-BR')}
-                                </span>
-                                {c.proximo_retorno && (
-                                  <span className="status-badge" style={{ color: 'var(--success-green)', borderColor: 'var(--success-green)', backgroundColor: 'rgba(21, 128, 61, 0.05)', fontSize: '11px', padding: '2px 8px' }}>
-                                    Retorno: {new Date(c.proximo_retorno + 'T00:00:00').toLocaleDateString('pt-BR')}
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ display: 'flex', gap: '8px' }} className="no-print">
-                                <button 
-                                  className="btn-ghost" 
-                                  style={{ padding: '4px 8px', fontSize: '12px', color: 'var(--text-muted)' }}
-                                  onClick={() => {
-                                    setConsultaToEdit(c);
-                                    setIsConsultationModalOpen(true);
-                                  }}
-                                >
-                                  Editar
-                                </button>
-                                <button 
-                                  className="btn-ghost" 
-                                  style={{ padding: '4px 8px', fontSize: '12px', color: '#ef4444' }}
-                                  onClick={() => handleDeleteConsulta(c.id)}
-                                >
-                                  Excluir
-                                </button>
-                              </div>
+              return renderEvolucaoChart(consultas);
+            })()}
+
+            {p.consultas && p.consultas.length > 0 ? (
+              [...p.consultas]
+                .sort((a, b) => b.data_consulta.localeCompare(a.data_consulta))
+                .map(c => {
+                  const bmi = p.altura && c.peso 
+                    ? (c.peso / Math.pow(p.altura / 100, 2)).toFixed(1)
+                    : null;
+                  return (
+                    <div key={c.id} className="timeline-item">
+                      <div className="timeline-card">
+                        <div className="timeline-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            <span className="timeline-date">
+                              Consulta em {new Date(c.data_consulta + 'T00:00:00').toLocaleDateString('pt-BR')}
+                            </span>
+                            {c.proximo_retorno && (
+                              <span className="status-badge" style={{ color: 'var(--success-green)', borderColor: 'var(--success-green)', backgroundColor: 'rgba(21, 128, 61, 0.05)', fontSize: '11px', padding: '2px 8px' }}>
+                                Retorno: {new Date(c.proximo_retorno + 'T00:00:00').toLocaleDateString('pt-BR')}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px' }} className="no-print">
+                            <button 
+                              className="btn-ghost" 
+                              style={{ padding: '4px 8px', fontSize: '12px', color: 'var(--text-muted)' }}
+                              onClick={() => {
+                                setConsultaToEdit(c);
+                                setIsConsultationModalOpen(true);
+                              }}
+                            >
+                              Editar
+                            </button>
+                            <button 
+                              className="btn-ghost" 
+                              style={{ padding: '4px 8px', fontSize: '12px', color: '#ef4444' }}
+                              onClick={() => handleDeleteConsulta(c.id)}
+                            >
+                              Excluir
+                            </button>
+                          </div>
+                        </div>
+                        <div className="timeline-metrics">
+                          {c.peso && (
+                            <div className="metric-item">
+                              <span className="metric-label">Peso</span>
+                              <span className="metric-value">{c.peso} kg</span>
                             </div>
-                            <div className="timeline-metrics">
-                              {c.peso && (
-                                <div className="metric-item">
-                                  <span className="metric-label">Peso</span>
-                                  <span className="metric-value">{c.peso} kg</span>
-                                </div>
-                              )}
-                              {bmi && (
-                                <div className="metric-item">
-                                  <span className="metric-label">IMC</span>
-                                  <span className="metric-value">{bmi}</span>
-                                </div>
-                              )}
-                              {c.cintura && (
-                                <div className="metric-item">
-                                  <span className="metric-label">Cintura</span>
-                                  <span className="metric-value">{c.cintura} cm</span>
-                                </div>
-                              )}
-                              {c.quadril && (
-                                <div className="metric-item">
-                                  <span className="metric-label">Quadril</span>
-                                  <span className="metric-value">{c.quadril} cm</span>
-                                </div>
-                              )}
-                              {c.percentual_gordura && (
-                                <div className="metric-item">
-                                  <span className="metric-label">% Gordura</span>
-                                  <span className="metric-value">{c.percentual_gordura}%</span>
-                                </div>
-                              )}
+                          )}
+                          {bmi && (
+                            <div className="metric-item">
+                              <span className="metric-label">IMC</span>
+                              <span className="metric-value">{bmi}</span>
                             </div>
-                            {c.observacoes && (
-                              <div className="timeline-notes">
-                                <strong>Observações:</strong> {c.observacoes}
+                          )}
+                          {c.cintura && (
+                            <div className="metric-item">
+                              <span className="metric-label">Cintura</span>
+                              <span className="metric-value">{c.cintura} cm</span>
+                            </div>
+                          )}
+                          {c.quadril && (
+                            <div className="metric-item">
+                              <span className="metric-label">Quadril</span>
+                              <span className="metric-value">{c.quadril} cm</span>
+                            </div>
+                          )}
+                          {c.percentual_gordura && (
+                            <div className="metric-item">
+                              <span className="metric-label">% Gordura</span>
+                              <span className="metric-value">{c.percentual_gordura}%</span>
+                            </div>
+                          )}
+                        </div>
+                        {c.observacoes && (
+                          <div className="timeline-notes">
+                            <strong>Observações:</strong> {c.observacoes}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })
+            ) : (
+              <div className="empty-state" style={{ padding: '40px 0' }}>
+                <Calendar size={48} />
+                <h3>Nenhuma consulta registrada</h3>
+                <p>Você ainda não registrou nenhuma consulta para este paciente.</p>
+                <button className="btn-secondary" style={{ marginTop: '16px' }} onClick={() => setIsConsultationModalOpen(true)}>
+                  Registrar Primeira Consulta
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ===== SEÇÃO 3 — PLANOS ALIMENTARES ===== */}
+        {profileTab === 'planos' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {isEditingPlan ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px' }}>Editar Plano Alimentar</h3>
+                  <button 
+                    className="btn-primary flex items-center gap-2" 
+                    style={{ padding: '6px 12px', fontSize: '13px', backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' }}
+                    onClick={async () => {
+                      if (planText && !window.confirm('Isso irá substituir o texto atual do plano. Deseja continuar?')) return;
+                      try {
+                        const { generateMealPlan } = await import('./lib/ai');
+                        const btn = document.getElementById('btn-ai-generate');
+                        if (btn) btn.innerHTML = '<span class="animate-spin">⏳</span> Gerando...';
+                        const aiPlan = await generateMealPlan(p);
+                        setPlanText(aiPlan);
+                        if (btn) btn.innerHTML = '✨ Gerar com I.A.';
+                      } catch (err: any) {
+                        alert(err.message);
+                        const btn = document.getElementById('btn-ai-generate');
+                        if (btn) btn.innerHTML = '✨ Gerar com I.A.';
+                      }
+                    }}
+                    id="btn-ai-generate"
+                  >
+                    ✨ Gerar com I.A.
+                  </button>
+                </div>
+                <textarea
+                  className="plan-editor-textarea"
+                  value={planText}
+                  onChange={(e) => setPlanText(e.target.value)}
+                  placeholder="Digite aqui as refeições, horários e orientações nutricionais do paciente..."
+                />
+                <div className="plan-actions">
+                  <button className="btn-ghost" onClick={() => setIsEditingPlan(false)}>Cancelar</button>
+                  <button className="btn-primary" onClick={handleSavePlan}>Salvar Plano</button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                {/* Botão Gerar Plano Alimentar sempre visível */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
+                  <h3 style={{ margin: 0, fontSize: '16px' }}>Planos Alimentares</h3>
+                  <button 
+                    className="btn-primary flex items-center gap-2" 
+                    style={{ padding: '10px 20px', fontSize: '14px' }}
+                    onClick={() => { setPlanText(''); setIsEditingPlan(true); }}
+                  >
+                    <Utensils size={18} /> Gerar Plano Alimentar
+                  </button>
+                </div>
+
+                {p.planos_alimentares && p.planos_alimentares.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {[...p.planos_alimentares]
+                      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+                      .map((plan, idx) => {
+                        const isExpanded = expandedPlanId === plan.id;
+                        const textoPlano = (plan.conteudo as { texto?: string })?.texto || 'Sem conteúdo.';
+                        const dataCriacao = plan.created_at ? new Date(plan.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Data não disponível';
+                        
+                        return (
+                          <div key={plan.id} className="plan-history-item" style={{ border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden', backgroundColor: 'var(--bg-sidebar)' }}>
+                            <button 
+                              onClick={() => setExpandedPlanId(isExpanded ? null : plan.id)}
+                              style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-main)', fontSize: '14px', fontWeight: 500 }}
+                            >
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <Utensils size={16} style={{ color: 'var(--success-green)' }} />
+                                <span>Plano Alimentar {idx === 0 ? '(Mais recente)' : `#${p.planos_alimentares!.length - idx}`}</span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{dataCriacao}</span>
+                                <span style={{ fontSize: '16px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+                              </div>
+                            </button>
+                            {isExpanded && (
+                              <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border-color)' }}>
+                                <div className="plan-view-content" style={{ whiteSpace: 'pre-wrap', padding: '16px 0', fontSize: '14px', lineHeight: '1.6' }}>
+                                  {textoPlano}
+                                </div>
+                                <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
+                                  <button 
+                                    className="btn-ghost flex items-center gap-1"
+                                    style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '6px' }}
+                                    onClick={() => handleSendWhatsApp(p, textoPlano)}
+                                  >
+                                    <Send size={14} style={{ color: '#25D366' }} /> WhatsApp
+                                  </button>
+                                  <button 
+                                    className="btn-ghost flex items-center gap-1"
+                                    style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '6px' }}
+                                    onClick={() => window.print()}
+                                  >
+                                    <Printer size={14} /> PDF
+                                  </button>
+                                  <button 
+                                    className="btn-ghost"
+                                    style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--success-green)', fontWeight: 600 }}
+                                    onClick={() => {
+                                      setPlanText(textoPlano);
+                                      setIsEditingPlan(true);
+                                    }}
+                                  >
+                                    Editar
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
-                        </div>
-                      )
-                    })
-                ) : (
-                  <div className="empty-state" style={{ padding: '40px 0' }}>
-                    <Calendar size={48} />
-                    <h3>Nenhuma consulta registrada</h3>
-                    <p>Você ainda não registrou nenhuma consulta para este paciente.</p>
-                    <button className="btn-secondary" style={{ marginTop: '16px' }} onClick={() => setIsConsultationModalOpen(true)}>
-                      Registrar Primeira Consulta
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {profileTab === 'planos' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {isEditingPlan ? (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <h3 style={{ margin: 0, fontSize: '16px' }}>Editar Plano Alimentar</h3>
-                      <button 
-                        className="btn-primary flex items-center gap-2" 
-                        style={{ padding: '6px 12px', fontSize: '13px', backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' }}
-                        onClick={async () => {
-                          if (planText && !window.confirm('Isso irá substituir o texto atual do plano. Deseja continuar?')) return;
-                          try {
-                            const { generateMealPlan } = await import('./lib/ai');
-                            const btn = document.getElementById('btn-ai-generate');
-                            if (btn) btn.innerHTML = '<span class="animate-spin">⏳</span> Gerando...';
-                            const aiPlan = await generateMealPlan(p);
-                            setPlanText(aiPlan);
-                            if (btn) btn.innerHTML = '✨ Gerar com I.A.';
-                          } catch (err: any) {
-                            alert(err.message);
-                            const btn = document.getElementById('btn-ai-generate');
-                            if (btn) btn.innerHTML = '✨ Gerar com I.A.';
-                          }
-                        }}
-                        id="btn-ai-generate"
-                      >
-                        ✨ Gerar com I.A.
-                      </button>
-                    </div>
-                    <textarea
-                      className="plan-editor-textarea"
-                      value={planText}
-                      onChange={(e) => setPlanText(e.target.value)}
-                      placeholder="Digite aqui as refeições, horários e orientações nutricionais do paciente..."
-                    />
-                    <div className="plan-actions">
-                      <button 
-                        className="btn-ghost" 
-                        onClick={() => setIsEditingPlan(false)}
-                      >
-                        Cancelar
-                      </button>
-                      <button 
-                        className="btn-primary" 
-                        onClick={handleSavePlan}
-                      >
-                        Salvar Plano
-                      </button>
-                    </div>
+                        );
+                      })
+                    }
                   </div>
                 ) : (
-                  <div>
-                    {p.planos_alimentares && p.planos_alimentares.length > 0 ? (
-                      <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-                          <h3 style={{ margin: 0, fontSize: '16px' }}>Plano Alimentar Ativo</h3>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button 
-                              className="btn-ghost flex items-center gap-1"
-                              style={{ padding: '8px 12px', fontSize: '13px', borderColor: 'var(--border-color)', border: '1px solid var(--border-color)', borderRadius: '6px' }}
-                              onClick={() => {
-                                const textoPlano = (p.planos_alimentares?.[0]?.conteudo as { texto?: string })?.texto || '';
-                                handleSendWhatsApp(p, textoPlano);
-                              }}
-                              title="Enviar por WhatsApp"
-                            >
-                              <Send size={16} style={{ color: '#25D366' }} />
-                              <span>WhatsApp</span>
-                            </button>
-                            <button 
-                              className="btn-ghost flex items-center gap-1"
-                              style={{ padding: '8px 12px', fontSize: '13px', borderColor: 'var(--border-color)', border: '1px solid var(--border-color)', borderRadius: '6px' }}
-                              onClick={() => window.print()}
-                              title="Imprimir ou Salvar PDF"
-                            >
-                              <Printer size={16} />
-                              <span>PDF</span>
-                            </button>
-                            <button 
-                              className="btn-primary" 
-                              style={{ padding: '8px 16px', fontSize: '14px' }}
-                              onClick={() => {
-                                const plan = p.planos_alimentares?.[0];
-                                const content = plan?.conteudo as { texto?: string };
-                                setPlanText(content?.texto || '');
-                                setIsEditingPlan(true);
-                              }}
-                            >
-                              Editar Plano
-                            </button>
-                          </div>
-                        </div>
-                        <div id="print-section" className="plan-view-container-print">
-                          <div className="print-only-header">
-                            <h1>nutrido jl</h1>
-                            <p>Plano Alimentar de {p.nome}</p>
-                          </div>
-                          <div className="plan-view-content" style={{ whiteSpace: 'pre-wrap' }}>
-                            {(p.planos_alimentares[0].conteudo as { texto?: string })?.texto || 'Sem conteúdo.'}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="empty-state" style={{ padding: '60px 0' }}>
-                        <Utensils size={48} />
-                        <h3>Nenhum plano alimentar cadastrado</h3>
-                        <p>Cadastre o primeiro plano alimentar estruturado para este paciente.</p>
-                        <button 
-                          className="btn-secondary" 
-                          style={{ marginTop: '16px' }}
-                          onClick={() => {
-                            setPlanText('');
-                            setIsEditingPlan(true);
-                          }}
-                        >
-                          Criar Plano Alimentar
-                        </button>
-                      </div>
-                    )}
+                  <div className="empty-state" style={{ padding: '60px 0' }}>
+                    <Utensils size={48} />
+                    <h3>Nenhum plano alimentar gerado ainda</h3>
+                    <p>Clique no botão acima para criar o primeiro plano alimentar deste paciente.</p>
                   </div>
                 )}
               </div>
             )}
           </div>
-        </div>
+        )}
       </div>
     );
   }
