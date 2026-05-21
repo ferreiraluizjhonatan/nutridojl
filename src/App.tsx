@@ -49,7 +49,12 @@ function App() {
   const [planText, setPlanText] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [consultaToEdit, setConsultaToEdit] = useState<Consulta | null>(null)
-  const [isResettingPassword, setIsResettingPassword] = useState(false)
+  const [isResettingPassword, setIsResettingPassword] = useState(() => {
+    return window.location.hash.includes('type=recovery') || 
+           window.location.search.includes('type=recovery') ||
+           window.location.hash.includes('recovery') ||
+           window.location.search.includes('recovery');
+  })
 
 
   useEffect(() => {

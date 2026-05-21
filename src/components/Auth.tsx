@@ -113,6 +113,10 @@ export function Auth({ isResettingPassword = false, onPasswordResetComplete }: A
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       alert('Senha atualizada com sucesso!');
+      
+      // Limpa os parâmetros de recovery/access_token da URL
+      window.history.replaceState({}, document.title, window.location.origin + window.location.pathname);
+      
       if (onPasswordResetComplete) {
         onPasswordResetComplete();
       }
