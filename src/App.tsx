@@ -13,15 +13,18 @@ import {
   Clock,
   Activity,
   User,
-  Printer,
-  Send,
   Menu,
   X
 } from 'lucide-react'
 import { Auth } from './components/Auth'
 import { PatientModal } from './components/PatientModal'
 import { ConsultationModal } from './components/ConsultationModal'
+import { MealPlanManager } from './components/MealPlanManager'
 import './App.css'
+const OBJETIVOS_OPCOES = ['Emagrecer', 'Ganhar massa', 'Controlar diabetes', 'Saúde geral', 'Performance esportiva', 'Reeducação alimentar'];
+const PATOLOGIAS_OPCOES = ['Diabetes', 'Hipertensão', 'Hipotireoidismo', 'Hipertireoidismo', 'Síndrome do ovário policístico', 'Doença celíaca', 'Colesterol alto'];
+const RESTRICOES_OPCOES = ['Lactose', 'Glúten', 'Açúcar', 'Carne vermelha', 'Frutos do mar'];
+const ALERGIAS_OPCOES = ['Amendoim', 'Leite', 'Ovo', 'Soja', 'Trigo', 'Frutos do mar'];
 
 type Paciente = Database['public']['Tables']['pacientes']['Row']
 type Consulta = Database['public']['Tables']['consultas']['Row']
@@ -29,6 +32,19 @@ type PlanoAlimentar = Database['public']['Tables']['planos_alimentares']['Row']
 type PacienteComConsultas = Paciente & {
   consultas?: Consulta[]
   planos_alimentares?: PlanoAlimentar[]
+}
+
+const formatTimeInput = (value: string): string => {
+  if (!value) return ''
+  const clean = value.replace(/[^\d]/g, '')
+  if (clean.length === 0) return ''
+  if (clean.length <= 2) {
+    const hours = Math.min(23, parseInt(clean, 10)).toString().padStart(2, '0')
+    return `${hours}:00`
+  }
+  const hours = Math.min(23, parseInt(clean.slice(0, 2), 10)).toString().padStart(2, '0')
+  const minutes = Math.min(59, parseInt(clean.slice(2, 4), 10)).toString().padStart(2, '0')
+  return `${hours}:${minutes}`
 }
 
 function App() {
@@ -42,13 +58,10 @@ function App() {
   const [selectedPatient, setSelectedPatient] = useState<PacienteComConsultas | null>(null)
   const [profileTab, setProfileTab] = useState<'dados' | 'consultas' | 'planos'>('dados')
   const [dataSubTab, setDataSubTab] = useState<'pessoal' | 'clinico' | 'habitos'>('pessoal')
-  const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   
   // Estados para edição
   const [patientToEdit, setPatientToEdit] = useState<PacienteComConsultas | null>(null)
-  const [isEditingPlan, setIsEditingPlan] = useState(false)
-  const [planText, setPlanText] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [consultaToEdit, setConsultaToEdit] = useState<Consulta | null>(null)
   const [isResettingPassword, setIsResettingPassword] = useState(() => {
@@ -57,6 +70,14 @@ function App() {
            window.location.hash.includes('recovery') ||
            window.location.search.includes('recovery');
   })
+
+  // Estados para edição direta no perfil do paciente
+  const [profileFormData, setProfileFormData] = useState<Partial<PacienteComConsultas>>({})
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [isSavingPatient, setIsSavingPatient] = useState(false)
+  const [outroPatologiaText, setOutroPatologiaText] = useState('')
+  const [outroRestricaoText, setOutroRestricaoText] = useState('')
+  const [outroAlergiaText, setOutroAlergiaText] = useState('')
 
 
   useEffect(() => {
@@ -83,6 +104,43 @@ function App() {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  useEffect(() => {
+    if (selectedPatient) {
+      setProfileFormData({
+        nome: selectedPatient.nome || '',
+        email: selectedPatient.email || '',
+        telefone: selectedPatient.telefone || '',
+        whatsapp: selectedPatient.whatsapp || '',
+        data_nascimento: selectedPatient.data_nascimento || '',
+        sexo: selectedPatient.sexo || 'Feminino',
+        peso_inicial: selectedPatient.peso_inicial ?? undefined,
+        altura: selectedPatient.altura ?? undefined,
+        objetivos: selectedPatient.objetivos || [],
+        objetivo_texto: selectedPatient.objetivo_texto || '',
+        nivel_atividade: selectedPatient.nivel_atividade || 'Sedentário',
+        patologias: selectedPatient.patologias || [],
+        restricoes_alimentares: selectedPatient.restricoes_alimentares || [],
+        alergias: selectedPatient.alergias || [],
+        medicamentos: selectedPatient.medicamentos || '',
+        suplementos: selectedPatient.suplementos || '',
+        refeicoes_por_dia: selectedPatient.refeicoes_por_dia ?? 3,
+        horario_acorda: selectedPatient.horario_acorda || '',
+        horario_dorme: selectedPatient.horario_dorme || '',
+        litros_agua: selectedPatient.litros_agua ?? 2,
+        atividade_fisica: selectedPatient.atividade_fisica || false,
+        atividade_fisica_descricao: selectedPatient.atividade_fisica_descricao || '',
+        observacoes: selectedPatient.observacoes || ''
+      })
+      setSaveSuccess(false)
+      setOutroPatologiaText('')
+      setOutroRestricaoText('')
+      setOutroAlergiaText('')
+    } else {
+      setProfileFormData({})
+      setSaveSuccess(false)
+    }
+  }, [selectedPatient])
 
   async function fetchPacientes() {
     setLoading(true)
@@ -209,40 +267,128 @@ function App() {
     return list
   }
 
-  const handleSavePlan = async () => {
-    if (!selectedPatient) return;
-    setLoading(true);
-
-    try {
-      const plan = selectedPatient.planos_alimentares?.[0];
-      if (plan) {
-        // Atualizar plano existente
-        const { error } = await supabase
-          .from('planos_alimentares')
-          .update({ conteudo: { texto: planText } })
-          .eq('id', plan.id);
-
-        if (error) throw error;
-      } else {
-        // Inserir novo plano
-        const { error } = await supabase
-          .from('planos_alimentares')
-          .insert({
-            paciente_id: selectedPatient.id,
-            conteudo: { texto: planText }
-          });
-
-        if (error) throw error;
+  const handleProfileArrayChange = (field: 'objetivos' | 'patologias' | 'restricoes_alimentares' | 'alergias', option: string, isChecked: boolean) => {
+    setProfileFormData(prev => {
+      let currentArray = prev[field] || [];
+      
+      if (option === 'Nenhum') {
+        return { ...prev, [field]: isChecked ? ['Nenhum'] : [] };
       }
 
-      setIsEditingPlan(false);
-      await fetchPacientes();
-    } catch (err: any) {
-      alert('Erro ao salvar o plano alimentar: ' + err.message);
-    } finally {
-      setLoading(false);
+      if (isChecked) {
+        currentArray = currentArray.filter(v => v !== 'Nenhum'); // remove Nenhum
+        if (!currentArray.includes(option)) currentArray = [...currentArray, option];
+      } else {
+        currentArray = currentArray.filter(v => v !== option);
+      }
+      return { ...prev, [field]: currentArray };
+    });
+  };
+
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
+    setProfileFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : 
+               type === 'number' ? (value === '' ? undefined : parseFloat(value)) : value
+    }));
+  };
+
+  const handleSavePatientProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPatient) return;
+    if (!profileFormData.nome || profileFormData.nome.trim() === '') {
+      alert('Por favor, preencha o Nome Completo do paciente.');
+      return;
     }
-  }
+
+    setIsSavingPatient(true);
+    setSaveSuccess(false);
+
+    try {
+      // Concatena os campos de texto "Outro" aos arrays antes de salvar
+      let finalPatologias = [...(profileFormData.patologias || [])];
+      if (outroPatologiaText.trim() !== '') {
+        finalPatologias = finalPatologias.filter(p => p !== 'Nenhum');
+        if (!finalPatologias.includes(outroPatologiaText.trim())) {
+          finalPatologias.push(outroPatologiaText.trim());
+        }
+      }
+
+      let finalRestricoes = [...(profileFormData.restricoes_alimentares || [])];
+      if (outroRestricaoText.trim() !== '') {
+        finalRestricoes = finalRestricoes.filter(r => r !== 'Nenhum');
+        if (!finalRestricoes.includes(outroRestricaoText.trim())) {
+          finalRestricoes.push(outroRestricaoText.trim());
+        }
+      }
+
+      let finalAlergias = [...(profileFormData.alergias || [])];
+      if (outroAlergiaText.trim() !== '') {
+        finalAlergias = finalAlergias.filter(a => a !== 'Nenhum');
+        if (!finalAlergias.includes(outroAlergiaText.trim())) {
+          finalAlergias.push(outroAlergiaText.trim());
+        }
+      }
+
+      const payload = {
+        nome: profileFormData.nome.trim(),
+        email: profileFormData.email ? profileFormData.email.trim() : null,
+        telefone: profileFormData.telefone ? profileFormData.telefone.trim() : null,
+        whatsapp: profileFormData.whatsapp ? profileFormData.whatsapp.trim() : null,
+        data_nascimento: profileFormData.data_nascimento || null,
+        sexo: profileFormData.sexo || null,
+        peso_inicial: profileFormData.peso_inicial ?? null,
+        altura: profileFormData.altura ?? null,
+        objetivos: profileFormData.objetivos || [],
+        objetivo_texto: profileFormData.objetivo_texto || null,
+        nivel_atividade: profileFormData.nivel_atividade || null,
+        patologias: finalPatologias,
+        restricoes_alimentares: finalRestricoes,
+        alergias: finalAlergias,
+        medicamentos: profileFormData.medicamentos || null,
+        suplementos: profileFormData.suplementos || null,
+        refeicoes_por_dia: profileFormData.refeicoes_por_dia ?? null,
+        horario_acorda: profileFormData.horario_acorda || null,
+        horario_dorme: profileFormData.horario_dorme || null,
+        litros_agua: profileFormData.litros_agua ?? null,
+        atividade_fisica: profileFormData.atividade_fisica ?? false,
+        atividade_fisica_descricao: profileFormData.atividade_fisica_descricao || null,
+        observacoes: profileFormData.observacoes || null,
+      };
+
+      const { error } = await supabase
+        .from('pacientes')
+        .update(payload)
+        .eq('id', selectedPatient.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setSaveSuccess(true);
+      setOutroPatologiaText('');
+      setOutroRestricaoText('');
+      setOutroAlergiaText('');
+
+      const freshData = await fetchPacientes();
+      if (freshData) {
+        const found = freshData.find(p => p.id === selectedPatient.id);
+        if (found) {
+          setSelectedPatient(found);
+        }
+      }
+
+      // Ocultar mensagem de sucesso após 4 segundos
+      setTimeout(() => {
+        setSaveSuccess(false);
+      }, 4000);
+    } catch (err: any) {
+      alert('Erro ao salvar as alterações do paciente: ' + err.message);
+    } finally {
+      setIsSavingPatient(false);
+    }
+  };
 
   const handleDeleteConsulta = async (consultaId: string) => {
     if (!window.confirm('Tem certeza de que deseja excluir esta consulta? Esta ação não pode ser desfeita.')) {
@@ -284,8 +430,13 @@ function App() {
       .filter(c => c.peso !== null || c.percentual_gordura !== null)
       .sort((a, b) => a.data_consulta.localeCompare(b.data_consulta))
 
-    if (validConsultas.length < 2) {
-      return null
+    if (validConsultas.length === 0) {
+      return (
+        <div className="chart-empty-container" style={{ margin: '0 0 24px 0' }}>
+          <h4>Evolução Física do Paciente</h4>
+          <p>Nenhuma consulta registrada ainda</p>
+        </div>
+      )
     }
 
     const width = 600
@@ -299,20 +450,22 @@ function App() {
     const chartHeight = height - paddingTop - paddingBottom
 
     const pesos = validConsultas.map(c => c.peso).filter((p): p is number => p !== null)
-    const minPeso = pesos.length > 0 ? Math.min(...pesos) * 0.95 : 0
-    const maxPeso = pesos.length > 0 ? Math.max(...pesos) * 1.05 : 100
+    const minPeso = pesos.length > 0 ? (pesos.length === 1 ? pesos[0] * 0.9 : Math.min(...pesos) * 0.95) : 0
+    const maxPeso = pesos.length > 0 ? (pesos.length === 1 ? pesos[0] * 1.1 : Math.max(...pesos) * 1.05) : 100
     const diffPeso = maxPeso - minPeso || 1
 
     const gorduras = validConsultas.map(c => c.percentual_gordura).filter((g): g is number => g !== null)
-    const minGordura = gorduras.length > 0 ? Math.min(...gorduras) * 0.95 : 0
-    const maxGordura = gorduras.length > 0 ? Math.max(...gorduras) * 1.05 : 100
+    const minGordura = gorduras.length > 0 ? (gorduras.length === 1 ? gorduras[0] * 0.9 : Math.min(...gorduras) * 0.95) : 0
+    const maxGordura = gorduras.length > 0 ? (gorduras.length === 1 ? gorduras[0] * 1.1 : Math.max(...gorduras) * 1.05) : 100
     const diffGordura = maxGordura - minGordura || 1
 
     const pointsPeso: { x: number; y: number; val: number; date: string }[] = []
     const pointsGordura: { x: number; y: number; val: number; date: string }[] = []
 
     validConsultas.forEach((c, idx) => {
-      const x = paddingLeft + (idx * chartWidth) / (validConsultas.length - 1)
+      const x = validConsultas.length === 1 
+        ? paddingLeft + chartWidth / 2 
+        : paddingLeft + (idx * chartWidth) / (validConsultas.length - 1)
       const dateStr = new Date(c.data_consulta + 'T00:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })
 
       if (c.peso !== null) {
@@ -326,7 +479,7 @@ function App() {
     })
 
     const getPathD = (pts: typeof pointsPeso) => {
-      if (pts.length === 0) return ''
+      if (pts.length < 2) return ''
       return pts.reduce((acc, p, idx) => {
         return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`
       }, '')
@@ -394,7 +547,9 @@ function App() {
             )}
 
             {validConsultas.map((c, idx) => {
-              const x = paddingLeft + (idx * chartWidth) / (validConsultas.length - 1)
+              const x = validConsultas.length === 1
+                ? paddingLeft + chartWidth / 2
+                : paddingLeft + (idx * chartWidth) / (validConsultas.length - 1)
               const dateStr = new Date(c.data_consulta + 'T00:00:00').toLocaleDateString('pt-BR', { day: 'numeric', month: 'short' })
               return (
                 <text key={idx} x={x} y={height - 10} textAnchor="middle" fontSize="10" fontWeight="600" fill="var(--text-muted)">
@@ -406,27 +561,6 @@ function App() {
         </div>
       </div>
     )
-  }
-
-  const formatWhatsAppNumber = (phoneStr: string | null) => {
-    if (!phoneStr) return ''
-    const cleaned = phoneStr.replace(/\D/g, '')
-    if (cleaned.length === 0) return ''
-    if (cleaned.length === 10 || cleaned.length === 11) {
-      return '55' + cleaned
-    }
-    return cleaned
-  }
-
-  const handleSendWhatsApp = (paciente: PacienteComConsultas, planoTexto: string) => {
-    const telefone = formatWhatsAppNumber(paciente.whatsapp || paciente.telefone)
-    if (!telefone) {
-      alert('Paciente não possui WhatsApp ou telefone cadastrado.')
-      return
-    }
-    const saudacao = `Olá, ${paciente.nome}! Segue o seu plano alimentar atualizado da nutrido JL:\n\n`
-    const link = `https://wa.me/${telefone}?text=${encodeURIComponent(saudacao + planoTexto)}`
-    window.open(link, '_blank')
   }
 
   const handlePatientClick = (p: PacienteComConsultas) => {
@@ -453,13 +587,6 @@ function App() {
   const renderPatientProfile = () => {
     if (!selectedPatient) return null;
     const p = selectedPatient;
-
-    const calcIMC = () => {
-      if (p.peso_inicial && p.altura) {
-        return (p.peso_inicial / Math.pow(p.altura / 100, 2)).toFixed(1);
-      }
-      return null;
-    };
 
     return (
       <div className="profile-container">
@@ -509,6 +636,16 @@ function App() {
         {/* ===== SEÇÃO 1 — DADOS DO PACIENTE ===== */}
         {profileTab === 'dados' && (
           <div className="profile-data-section">
+            {saveSuccess && (
+              <div className="success-banner">
+                <span style={{ fontSize: '20px' }}>✓</span>
+                <div>
+                  <strong>Alterações salvas com sucesso!</strong>
+                  <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: 'inherit' }}>Os dados do paciente foram atualizados no banco de dados.</p>
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
               <div className="data-sub-tabs">
                 <button className={`data-sub-tab ${dataSubTab === 'pessoal' ? 'active' : ''}`} onClick={() => setDataSubTab('pessoal')}>
@@ -521,163 +658,193 @@ function App() {
                   <Clock size={14} /> Hábitos
                 </button>
               </div>
-              <button 
-                className="btn-primary flex items-center gap-2" 
-                style={{ padding: '8px 16px', fontSize: '13px' }}
-                onClick={() => { setPatientToEdit(p); setIsModalOpen(true); }}
-              >
-                Editar Dados
-              </button>
             </div>
 
-            {dataSubTab === 'pessoal' && (
-              <div className="profile-card fade-in">
-                <div className="profile-info-grid">
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Nome Completo</span>
-                    <span className="profile-info-value">{p.nome}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">E-mail</span>
-                    <span className="profile-info-value">{p.email || '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Telefone</span>
-                    <span className="profile-info-value">{p.telefone || '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">WhatsApp</span>
-                    <span className="profile-info-value">{p.whatsapp || '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Data de Nascimento</span>
-                    <span className="profile-info-value">{p.data_nascimento ? new Date(p.data_nascimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Idade</span>
-                    <span className="profile-info-value">{calcularIdade(p.data_nascimento)}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Sexo</span>
-                    <span className="profile-info-value">{p.sexo || '-'}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {dataSubTab === 'clinico' && (
-              <div className="profile-card fade-in">
-                <div className="profile-info-grid">
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Peso Inicial</span>
-                    <span className="profile-info-value">{p.peso_inicial ? `${p.peso_inicial} kg` : '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Altura</span>
-                    <span className="profile-info-value">{p.altura ? `${p.altura} cm` : '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">IMC</span>
-                    <span className="profile-info-value">{calcIMC() || '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Nível de Atividade</span>
-                    <span className="profile-info-value">{p.nivel_atividade || '-'}</span>
-                  </div>
-                </div>
-
-                <div className="profile-info-block">
-                  <span className="profile-info-label">Objetivos</span>
-                  <div className="profile-tags">
-                    {p.objetivos && p.objetivos.length > 0 
-                      ? p.objetivos.map((o, i) => <span key={i} className="profile-tag">{o}</span>)
-                      : <span className="profile-info-value">-</span>
-                    }
-                  </div>
-                  {p.objetivo_texto && <p className="profile-info-value" style={{ marginTop: '4px' }}>{p.objetivo_texto}</p>}
-                </div>
-
-                <div className="profile-info-block">
-                  <span className="profile-info-label">Patologias</span>
-                  <div className="profile-tags">
-                    {p.patologias && p.patologias.length > 0 
-                      ? p.patologias.map((pt, i) => <span key={i} className="profile-tag tag-warning">{pt}</span>)
-                      : <span className="profile-info-value">Nenhuma</span>
-                    }
-                  </div>
-                </div>
-
-                <div className="profile-info-block">
-                  <span className="profile-info-label">Restrições Alimentares</span>
-                  <div className="profile-tags">
-                    {p.restricoes_alimentares && p.restricoes_alimentares.length > 0 
-                      ? p.restricoes_alimentares.map((r, i) => <span key={i} className="profile-tag tag-orange">{r}</span>)
-                      : <span className="profile-info-value">Nenhuma</span>
-                    }
-                  </div>
-                </div>
-
-                <div className="profile-info-block">
-                  <span className="profile-info-label">Alergias</span>
-                  <div className="profile-tags">
-                    {p.alergias && p.alergias.length > 0 
-                      ? p.alergias.map((a, i) => <span key={i} className="profile-tag tag-red">{a}</span>)
-                      : <span className="profile-info-value">Nenhuma</span>
-                    }
-                  </div>
-                </div>
-
-                <div className="profile-info-grid" style={{ marginTop: '16px' }}>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Medicamentos</span>
-                    <span className="profile-info-value">{p.medicamentos || '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Suplementos</span>
-                    <span className="profile-info-value">{p.suplementos || '-'}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {dataSubTab === 'habitos' && (
-              <div className="profile-card fade-in">
-                <div className="profile-info-grid">
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Refeições por Dia</span>
-                    <span className="profile-info-value">{p.refeicoes_por_dia || '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Água (Litros/dia)</span>
-                    <span className="profile-info-value">{p.litros_agua ? `${p.litros_agua} L` : '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Horário que Acorda</span>
-                    <span className="profile-info-value">{p.horario_acorda || '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Horário que Dorme</span>
-                    <span className="profile-info-value">{p.horario_dorme || '-'}</span>
-                  </div>
-                  <div className="profile-info-item">
-                    <span className="profile-info-label">Pratica Atividade Física?</span>
-                    <span className="profile-info-value">{p.atividade_fisica ? 'Sim' : 'Não'}</span>
-                  </div>
-                  {p.atividade_fisica_descricao && (
-                    <div className="profile-info-item">
-                      <span className="profile-info-label">Detalhes da Atividade</span>
-                      <span className="profile-info-value">{p.atividade_fisica_descricao}</span>
+            <form onSubmit={handleSavePatientProfile} className="profile-form-container patient-form" style={{ padding: 0 }}>
+              {dataSubTab === 'pessoal' && (
+                <div className="profile-card fade-in" style={{ padding: '24px' }}>
+                  <div className="form-grid">
+                    <div className="form-group full-width">
+                      <label>Nome Completo *</label>
+                      <input name="nome" value={profileFormData.nome || ''} onChange={handleProfileChange} placeholder="Ex: Maria Silva" required />
                     </div>
-                  )}
-                </div>
-                {p.observacoes && (
-                  <div className="profile-info-block" style={{ marginTop: '16px' }}>
-                    <span className="profile-info-label">Observações Gerais</span>
-                    <p className="profile-info-value" style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{p.observacoes}</p>
+                    <div className="form-group">
+                      <label>E-mail</label>
+                      <input type="email" name="email" value={profileFormData.email || ''} onChange={handleProfileChange} placeholder="email@exemplo.com" />
+                    </div>
+                    <div className="form-group">
+                      <label>Sexo</label>
+                      <select name="sexo" value={profileFormData.sexo || 'Feminino'} onChange={handleProfileChange}>
+                        <option value="Feminino">Feminino</option>
+                        <option value="Masculino">Masculino</option>
+                        <option value="Outro">Outro</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Data de Nascimento</label>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <input type="date" name="data_nascimento" value={profileFormData.data_nascimento || ''} onChange={handleProfileChange} style={{ flex: 1 }} />
+                        <span style={{ fontSize: '14px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                          {profileFormData.data_nascimento ? `${calcularIdade(profileFormData.data_nascimento)} anos` : ''}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label>Telefone</label>
+                      <input name="telefone" value={profileFormData.telefone || ''} onChange={handleProfileChange} placeholder="(00) 00000-0000" />
+                    </div>
+                    <div className="form-group">
+                      <label>WhatsApp</label>
+                      <input name="whatsapp" value={profileFormData.whatsapp || ''} onChange={handleProfileChange} placeholder="(00) 00000-0000" />
+                    </div>
                   </div>
-                )}
+                </div>
+              )}
+
+              {dataSubTab === 'clinico' && (
+                <div className="profile-card fade-in" style={{ padding: '24px' }}>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Peso Inicial (kg)</label>
+                      <input type="number" step="0.1" name="peso_inicial" value={profileFormData.peso_inicial ?? ''} onChange={handleProfileChange} placeholder="Ex: 70.5" />
+                    </div>
+                    <div className="form-group">
+                      <label>Altura (cm)</label>
+                      <input type="number" name="altura" value={profileFormData.altura ?? ''} onChange={handleProfileChange} placeholder="Ex: 175" />
+                    </div>
+                    <div className="form-group">
+                      <label>IMC Inicial</label>
+                      <input type="text" value={profileFormData.peso_inicial && profileFormData.altura ? (profileFormData.peso_inicial / Math.pow(profileFormData.altura / 100, 2)).toFixed(1) : ''} disabled style={{ backgroundColor: 'var(--border-color)', fontWeight: 600, color: 'var(--text-main)' }} placeholder="Automático" />
+                    </div>
+                    <div className="form-group">
+                      <label>Nível de Atividade (Geral)</label>
+                      <select name="nivel_atividade" value={profileFormData.nivel_atividade || 'Sedentário'} onChange={handleProfileChange}>
+                        <option value="Sedentário">Sedentário</option>
+                        <option value="Levemente ativo">Levemente ativo</option>
+                        <option value="Moderadamente ativo">Moderadamente ativo</option>
+                        <option value="Muito ativo">Muito ativo</option>
+                        <option value="Extremamente ativo">Extremamente ativo</option>
+                      </select>
+                    </div>
+                    
+                    <div className="form-group full-width">
+                      <label>Objetivo</label>
+                      <div className="checkbox-pill-group">
+                        {OBJETIVOS_OPCOES.map(opt => (
+                          <label key={opt} className={`checkbox-pill${profileFormData.objetivos?.includes(opt) ? ' checked' : ''}`}>
+                            <input type="checkbox" checked={profileFormData.objetivos?.includes(opt)} onChange={(e) => handleProfileArrayChange('objetivos', opt, e.target.checked)} /> {opt}
+                          </label>
+                        ))}
+                      </div>
+                      <input type="text" name="objetivo_texto" value={profileFormData.objetivo_texto || ''} onChange={handleProfileChange} placeholder="Outros objetivos/detalhes..." />
+                    </div>
+
+                    <div className="form-group full-width">
+                      <label>Patologias ou Condições de Saúde</label>
+                      <div className="checkbox-pill-group">
+                        <label className={`checkbox-pill${profileFormData.patologias?.includes('Nenhum') ? ' checked' : ''}`}>
+                          <input type="checkbox" checked={profileFormData.patologias?.includes('Nenhum')} onChange={(e) => handleProfileArrayChange('patologias', 'Nenhum', e.target.checked)} /> Nenhum
+                        </label>
+                        {PATOLOGIAS_OPCOES.map(opt => (
+                          <label key={opt} className={`checkbox-pill${profileFormData.patologias?.includes(opt) ? ' checked' : ''}${profileFormData.patologias?.includes('Nenhum') ? ' disabled' : ''}`}>
+                            <input type="checkbox" disabled={profileFormData.patologias?.includes('Nenhum')} checked={profileFormData.patologias?.includes(opt)} onChange={(e) => handleProfileArrayChange('patologias', opt, e.target.checked)} /> {opt}
+                          </label>
+                        ))}
+                      </div>
+                      <input type="text" value={outroPatologiaText} onChange={(e) => setOutroPatologiaText(e.target.value)} disabled={profileFormData.patologias?.includes('Nenhum')} placeholder="Adicionar outra patologia..." />
+                    </div>
+
+                    <div className="form-group full-width">
+                      <label>Restrições Alimentares</label>
+                      <div className="checkbox-pill-group">
+                        <label className={`checkbox-pill${profileFormData.restricoes_alimentares?.includes('Nenhum') ? ' checked' : ''}`}>
+                          <input type="checkbox" checked={profileFormData.restricoes_alimentares?.includes('Nenhum')} onChange={(e) => handleProfileArrayChange('restricoes_alimentares', 'Nenhum', e.target.checked)} /> Nenhum
+                        </label>
+                        {RESTRICOES_OPCOES.map(opt => (
+                          <label key={opt} className={`checkbox-pill${profileFormData.restricoes_alimentares?.includes(opt) ? ' checked' : ''}${profileFormData.restricoes_alimentares?.includes('Nenhum') ? ' disabled' : ''}`}>
+                            <input type="checkbox" disabled={profileFormData.restricoes_alimentares?.includes('Nenhum')} checked={profileFormData.restricoes_alimentares?.includes(opt)} onChange={(e) => handleProfileArrayChange('restricoes_alimentares', opt, e.target.checked)} /> {opt}
+                          </label>
+                        ))}
+                      </div>
+                      <input type="text" value={outroRestricaoText} onChange={(e) => setOutroRestricaoText(e.target.value)} disabled={profileFormData.restricoes_alimentares?.includes('Nenhum')} placeholder="Adicionar outra restrição..." />
+                    </div>
+
+                    <div className="form-group full-width">
+                      <label>Alergias Alimentares</label>
+                      <div className="checkbox-pill-group">
+                        <label className={`checkbox-pill${profileFormData.alergias?.includes('Nenhum') ? ' checked' : ''}`}>
+                          <input type="checkbox" checked={profileFormData.alergias?.includes('Nenhum')} onChange={(e) => handleProfileArrayChange('alergias', 'Nenhum', e.target.checked)} /> Nenhum
+                        </label>
+                        {ALERGIAS_OPCOES.map(opt => (
+                          <label key={opt} className={`checkbox-pill${profileFormData.alergias?.includes(opt) ? ' checked' : ''}${profileFormData.alergias?.includes('Nenhum') ? ' disabled' : ''}`}>
+                            <input type="checkbox" disabled={profileFormData.alergias?.includes('Nenhum')} checked={profileFormData.alergias?.includes(opt)} onChange={(e) => handleProfileArrayChange('alergias', opt, e.target.checked)} /> {opt}
+                          </label>
+                        ))}
+                      </div>
+                      <input type="text" value={outroAlergiaText} onChange={(e) => setOutroAlergiaText(e.target.value)} disabled={profileFormData.alergias?.includes('Nenhum')} placeholder="Adicionar outra alergia..." />
+                    </div>
+
+                    <div className="form-group full-width">
+                      <label>Medicamentos Contínuos</label>
+                      <textarea name="medicamentos" value={profileFormData.medicamentos || ''} onChange={handleProfileChange} rows={2} placeholder="Ex: Losartana 50mg/dia..." />
+                    </div>
+                    
+                    <div className="form-group full-width">
+                      <label>Suplementos em Uso</label>
+                      <textarea name="suplementos" value={profileFormData.suplementos || ''} onChange={handleProfileChange} rows={2} placeholder="Ex: Whey Protein, Creatina..." />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {dataSubTab === 'habitos' && (
+                <div className="profile-card fade-in" style={{ padding: '24px' }}>
+                  <div className="form-grid">
+                    <div className="form-group">
+                      <label>Refeições por dia</label>
+                      <input type="number" name="refeicoes_por_dia" value={profileFormData.refeicoes_por_dia ?? ''} onChange={handleProfileChange} placeholder="Ex: 4" />
+                    </div>
+                    <div className="form-group">
+                      <label>Água (Litros/dia)</label>
+                      <input type="number" step="0.1" name="litros_agua" value={profileFormData.litros_agua ?? ''} onChange={handleProfileChange} placeholder="Ex: 2.5" />
+                    </div>
+                    <div className="form-group">
+                      <label>Horário que Acorda</label>
+                      <input type="text" name="horario_acorda" value={profileFormData.horario_acorda || ''} onChange={handleProfileChange} onBlur={(e) => setProfileFormData(prev => ({...prev, horario_acorda: formatTimeInput(e.target.value)}))} placeholder="Ex: 06:00" />
+                    </div>
+                    <div className="form-group">
+                      <label>Horário que Dorme</label>
+                      <input type="text" name="horario_dorme" value={profileFormData.horario_dorme || ''} onChange={handleProfileChange} onBlur={(e) => setProfileFormData(prev => ({...prev, horario_dorme: formatTimeInput(e.target.value)}))} placeholder="Ex: 23:30" />
+                    </div>
+                    
+                    <div className="form-group full-width">
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                        <input type="checkbox" name="atividade_fisica" checked={profileFormData.atividade_fisica || false} onChange={handleProfileChange} />
+                        Pratica Atividade Física Atualmente?
+                      </label>
+                    </div>
+                    
+                    {profileFormData.atividade_fisica && (
+                      <div className="form-group full-width fade-in">
+                        <label>Qual atividade e frequência semanal?</label>
+                        <input type="text" name="atividade_fisica_descricao" value={profileFormData.atividade_fisica_descricao || ''} onChange={handleProfileChange} placeholder="Ex: Musculação 4x na semana" />
+                      </div>
+                    )}
+
+                    <div className="form-group full-width">
+                      <label>Observações Gerais</label>
+                      <textarea name="observacoes" value={profileFormData.observacoes || ''} onChange={handleProfileChange} rows={4} placeholder="Rotina, aversões alimentares, hábitos finais..." />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="profile-form-footer">
+                <button type="submit" className="btn-primary" disabled={isSavingPatient}>
+                  {isSavingPatient ? <Loader2 size={16} className="animate-spin" /> : 'Salvar alterações'}
+                </button>
               </div>
-            )}
+            </form>
           </div>
         )}
 
@@ -685,30 +852,7 @@ function App() {
         {profileTab === 'consultas' && (
           <div className="consultations-timeline">
             {/* Gráfico SEMPRE visível */}
-            {(() => {
-              const consultas = p.consultas || [];
-              const validConsultas = consultas.filter(c => c.peso !== null).sort((a, b) => a.data_consulta.localeCompare(b.data_consulta));
-              
-              if (validConsultas.length < 2) {
-                return (
-                  <div className="chart-container" style={{ margin: '0 0 24px 0', padding: '20px', backgroundColor: 'var(--bg-sidebar)', borderRadius: '12px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                    <h4 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: 600, color: 'var(--success-green)', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                      <Activity size={18} /> Evolução de Peso
-                    </h4>
-                    <div style={{ padding: '30px 0', color: 'var(--text-muted)', fontSize: '14px' }}>
-                      <Calendar size={32} style={{ marginBottom: '8px', opacity: 0.4 }} />
-                      <p style={{ margin: 0 }}>
-                        {consultas.length === 0 
-                          ? 'Nenhuma consulta registrada ainda' 
-                          : 'Registre pelo menos 2 consultas com peso para visualizar a evolução'}
-                      </p>
-                    </div>
-                  </div>
-                );
-              }
-
-              return renderEvolucaoChart(consultas);
-            })()}
+            {renderEvolucaoChart(p.consultas || [])}
 
             {p.consultas && p.consultas.length > 0 ? (
               [...p.consultas]
@@ -807,131 +951,7 @@ function App() {
 
         {/* ===== SEÇÃO 3 — PLANOS ALIMENTARES ===== */}
         {profileTab === 'planos' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {isEditingPlan ? (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <h3 style={{ margin: 0, fontSize: '16px' }}>Editar Plano Alimentar</h3>
-                  <button 
-                    className="btn-primary flex items-center gap-2" 
-                    style={{ padding: '6px 12px', fontSize: '13px', backgroundColor: '#8b5cf6', borderColor: '#8b5cf6' }}
-                    onClick={async () => {
-                      if (planText && !window.confirm('Isso irá substituir o texto atual do plano. Deseja continuar?')) return;
-                      try {
-                        const { generateMealPlan } = await import('./lib/ai');
-                        const btn = document.getElementById('btn-ai-generate');
-                        if (btn) btn.innerHTML = '<span class="animate-spin">⏳</span> Gerando...';
-                        const aiPlan = await generateMealPlan(p);
-                        setPlanText(aiPlan);
-                        if (btn) btn.innerHTML = '✨ Gerar com I.A.';
-                      } catch (err: any) {
-                        alert(err.message);
-                        const btn = document.getElementById('btn-ai-generate');
-                        if (btn) btn.innerHTML = '✨ Gerar com I.A.';
-                      }
-                    }}
-                    id="btn-ai-generate"
-                  >
-                    ✨ Gerar com I.A.
-                  </button>
-                </div>
-                <textarea
-                  className="plan-editor-textarea"
-                  value={planText}
-                  onChange={(e) => setPlanText(e.target.value)}
-                  placeholder="Digite aqui as refeições, horários e orientações nutricionais do paciente..."
-                />
-                <div className="plan-actions">
-                  <button className="btn-ghost" onClick={() => setIsEditingPlan(false)}>Cancelar</button>
-                  <button className="btn-primary" onClick={handleSavePlan}>Salvar Plano</button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                {/* Botão Gerar Plano Alimentar sempre visível */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
-                  <h3 style={{ margin: 0, fontSize: '16px' }}>Planos Alimentares</h3>
-                  <button 
-                    className="btn-primary flex items-center gap-2" 
-                    style={{ padding: '10px 20px', fontSize: '14px' }}
-                    onClick={() => { setPlanText(''); setIsEditingPlan(true); }}
-                  >
-                    <Utensils size={18} /> Gerar Plano Alimentar
-                  </button>
-                </div>
-
-                {p.planos_alimentares && p.planos_alimentares.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {[...p.planos_alimentares]
-                      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-                      .map((plan, idx) => {
-                        const isExpanded = expandedPlanId === plan.id;
-                        const textoPlano = (plan.conteudo as { texto?: string })?.texto || 'Sem conteúdo.';
-                        const dataCriacao = plan.created_at ? new Date(plan.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Data não disponível';
-                        
-                        return (
-                          <div key={plan.id} className="plan-history-item" style={{ border: '1px solid var(--border-color)', borderRadius: '10px', overflow: 'hidden', backgroundColor: 'var(--bg-sidebar)' }}>
-                            <button 
-                              onClick={() => setExpandedPlanId(isExpanded ? null : plan.id)}
-                              style={{ width: '100%', padding: '14px 16px', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-main)', fontSize: '14px', fontWeight: 500 }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <Utensils size={16} style={{ color: 'var(--success-green)' }} />
-                                <span>Plano Alimentar {idx === 0 ? '(Mais recente)' : `#${p.planos_alimentares!.length - idx}`}</span>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{dataCriacao}</span>
-                                <span style={{ fontSize: '16px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-                              </div>
-                            </button>
-                            {isExpanded && (
-                              <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border-color)' }}>
-                                <div className="plan-view-content" style={{ whiteSpace: 'pre-wrap', padding: '16px 0', fontSize: '14px', lineHeight: '1.6' }}>
-                                  {textoPlano}
-                                </div>
-                                <div style={{ display: 'flex', gap: '8px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
-                                  <button 
-                                    className="btn-ghost flex items-center gap-1"
-                                    style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '6px' }}
-                                    onClick={() => handleSendWhatsApp(p, textoPlano)}
-                                  >
-                                    <Send size={14} style={{ color: '#25D366' }} /> WhatsApp
-                                  </button>
-                                  <button 
-                                    className="btn-ghost flex items-center gap-1"
-                                    style={{ padding: '6px 12px', fontSize: '12px', border: '1px solid var(--border-color)', borderRadius: '6px' }}
-                                    onClick={() => window.print()}
-                                  >
-                                    <Printer size={14} /> PDF
-                                  </button>
-                                  <button 
-                                    className="btn-ghost"
-                                    style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--success-green)', fontWeight: 600 }}
-                                    onClick={() => {
-                                      setPlanText(textoPlano);
-                                      setIsEditingPlan(true);
-                                    }}
-                                  >
-                                    Editar
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    }
-                  </div>
-                ) : (
-                  <div className="empty-state" style={{ padding: '60px 0' }}>
-                    <Utensils size={48} />
-                    <h3>Nenhum plano alimentar gerado ainda</h3>
-                    <p>Clique no botão acima para criar o primeiro plano alimentar deste paciente.</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <MealPlanManager patient={p} onRefresh={fetchPacientes} />
         )}
       </div>
     );

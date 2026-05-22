@@ -1455,5 +1455,253 @@ strong, b, h1, h2, h3, .card-value {
   }
 }
 
+/* Novos estilos para o Perfil do Paciente e Consultas */
+.success-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-left: 5px solid var(--success-green);
+  color: #166534;
+  padding: 16px;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  animation: slideDown 0.3s ease-out;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.profile-form-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.profile-form-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+.chart-empty-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background-color: var(--bg-sidebar);
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.chart-empty-container h4 {
+  color: var(--success-green);
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.chart-empty-container p {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* Estilos para o MealPlanManager */
+.meal-plan-manager {
+  width: 100%;
+}
+
+.btn-back-square {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-sidebar);
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-back-square:hover {
+  background-color: var(--border-color);
+}
+
+.day-tabs-scroll-container {
+  overflow-x: auto;
+  width: 100%;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 2px;
+}
+
+/* Esconder barra de rolagem */
+.day-tabs-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+.day-tabs-scroll-container {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.day-tabs {
+  display: flex;
+  gap: 8px;
+  width: max-content;
+}
+
+.day-tab {
+  padding: 10px 20px;
+  background-color: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.day-tab:hover {
+  color: var(--success-green);
+  border-bottom-color: rgba(21, 128, 61, 0.3);
+}
+
+.day-tab.active {
+  color: var(--success-green);
+  border-bottom-color: var(--success-green);
+  font-weight: 700;
+}
+
+.meals-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 10px;
+}
+
+.meal-card {
+  background-color: var(--bg-sidebar);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: var(--card-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.meal-card:hover {
+  border-color: rgba(21, 128, 61, 0.25);
+  box-shadow: 0 6px 12px -2px rgb(0 0 0 / 0.08);
+}
+
+.meal-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 8px;
+}
+
+.meal-card-icon {
+  font-size: 20px;
+}
+
+.meal-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--success-green) !important;
+}
+
+.meal-inputs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meal-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-size: 14px;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.meal-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(21, 128, 61, 0.1);
+  background-color: var(--bg-sidebar);
+}
+
+.meal-plan-print-only {
+  display: none;
+}
+
+/* Regras de Impressão */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .app-container, 
+  .sidebar, 
+  .mobile-header, 
+  .no-print, 
+  button, 
+  form, 
+  header, 
+  nav, 
+  .profile-tabs, 
+  .btn-back,
+  .history-header,
+  .form-header-bar,
+  .day-tabs-scroll-container,
+  .plan-history-summary,
+  .plan-history-details button,
+  .success-banner {
+    display: none !important;
+  }
+  .main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+  .meal-plan-print-only {
+    display: block !important;
+  }
+  
+  /* Mantém cores e fundo na impressão */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+
+
 
 
