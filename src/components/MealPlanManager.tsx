@@ -284,16 +284,35 @@ export const MealPlanManager: React.FC<MealPlanManagerProps> = ({ patient, onRef
           {/* Abas dos Dias da Semana */}
           <div className="day-tabs-scroll-container">
             <div className="day-tabs">
-              {DIAS_CHAVES.map(diaKey => (
-                <button
-                  key={diaKey}
-                  type="button"
-                  className={`day-tab ${activeDay === diaKey ? 'active' : ''}`}
-                  onClick={() => setActiveDay(diaKey)}
-                >
-                  {DIAS_NOMES[diaKey]}
-                </button>
-              ))}
+              {DIAS_CHAVES.map(diaKey => {
+                const hasContent = REFEICOES_INFO.some(ref => 
+                  (currentPlan.dias[diaKey]?.[ref.key] || []).some(item => item.trim() !== '')
+                );
+                return (
+                  <button
+                    key={diaKey}
+                    type="button"
+                    className={`day-tab ${activeDay === diaKey ? 'active' : ''} ${hasContent ? 'has-content' : ''}`}
+                    onClick={() => setActiveDay(diaKey)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    <span>{DIAS_NOMES[diaKey]}</span>
+                    {hasContent && (
+                      <span 
+                        className="day-tab-dot" 
+                        style={{ 
+                          width: '6px', 
+                          height: '6px', 
+                          borderRadius: '50%', 
+                          backgroundColor: 'var(--success-green)',
+                          boxShadow: '0 0 4px var(--success-green)',
+                          flexShrink: 0
+                        }} 
+                      />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -364,7 +383,7 @@ export const MealPlanManager: React.FC<MealPlanManagerProps> = ({ patient, onRef
                       </div>
 
                       {isExpanded && (
-                        <div className="plan-history-details" style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)' }}>
+                        <div className="plan-history-details fade-in" style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)' }}>
                           {isStructured ? (
                             <div className="plan-structured-preview">
                               {/* Accordion ou Grid dos dias com conteúdo */}
