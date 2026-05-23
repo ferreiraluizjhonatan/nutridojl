@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Database } from '../types/database';
-import { Utensils, Plus, Send, Printer, ArrowLeft, Loader2, Save, Trash2 } from 'lucide-react';
+import { Utensils, Plus, Send, Printer, ArrowLeft, Loader2, Save, Trash2, Sparkles } from 'lucide-react';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Tipagem TypeScript para o Plano Alimentar
 export interface Refeicao {
@@ -96,6 +97,180 @@ export const MealPlanManager: React.FC<MealPlanManagerProps> = ({ patient, onRef
   const [activeDay, setActiveDay] = useState<DiaChave>('segunda');
   const [loading, setLoading] = useState(false);
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
+
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiStatusText, setAiStatusText] = useState('Analisando perfil do paciente...');
+
+  useEffect(() => {
+    if (!aiLoading) return;
+    const messages = [
+      'Analisando biometria e objetivos do paciente...',
+      'Cruzando restrições alimentares, alergias e patologias...',
+      'Elaborando cardápio personalizado para os 7 dias da semana...',
+      'Calculando opções saudáveis e equilibradas...',
+      'Finalizando montagem do JSON estruturado...'
+    ];
+    let idx = 0;
+    setAiStatusText(messages[0]);
+    const timer = setInterval(() => {
+      idx = (idx + 1) % messages.length;
+      setAiStatusText(messages[idx]);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [aiLoading]);
+
+  const handleGenerateAI = async (isInsideForm = false) => {
+    if (isInsideForm && !window.confirm('Isto irá substituir o plano alimentar atual pela sugestão gerada pela I.A. Deseja continuar?')) {
+      return;
+    }
+
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      alert('Erro: Chave de API do Gemini não configurada. Configure a variável VITE_GEMINI_API_KEY no arquivo .env.');
+      return;
+    }
+
+    setAiLoading(true);
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      
+      const {
+        nome,
+        sexo,
+        peso_inicial,
+        altura,
+        nivel_atividade,
+        objetivo_texto,
+        patologias,
+        restricoes_alimentares,
+        alergias,
+        medicamentos,
+        suplementos,
+        horario_acorda,
+        horario_dorme,
+        litros_agua
+      } = patient;
+
+      const profileDesc = `
+        Paciente: ${nome}
+        Sexo: ${sexo || 'Não especificado'}
+        Peso: ${peso_inicial ? peso_inicial + ' kg' : 'Não informado'}
+        Altura: ${altura ? altura + ' m' : 'Não informada'}
+        Nível de Atividade: ${nivel_atividade || 'Não informado'}
+        Objetivo principal: ${objetivo_texto || 'Melhora da saúde e bem-estar'}
+        Patologias: ${patologias && patologias.length > 0 ? patologias.join(', ') : 'Nenhuma'}
+        Restrições Alimentares: ${restricoes_alimentares && restricoes_alimentares.length > 0 ? restricoes_alimentares.join(', ') : 'Nenhuma'}
+        Alergias Alimentares: ${alergias && alergias.length > 0 ? alergias.join(', ') : 'Nenhuma'}
+        Medicamentos: ${medicamentos || 'Nenhum'}
+        Suplementos: ${suplementos || 'Nenhum'}
+        Horários: Acorda às ${horario_acorda || 'N/A'}, dorme às ${horario_dorme || 'N/A'}
+        Metas de Água: ${litros_agua ? litros_agua + ' L/dia' : 'Não informado'}
+      `.trim();
+
+      const prompt = `
+        Você é um nutricionista experiente. Sua tarefa é elaborar um plano alimentar semanal estruturado e personalizado para o seguinte paciente:
+        
+        ${profileDesc}
+        
+        INSTRUÇÕES E REGRAS DE SAÚDE:
+        1. Respeite RIGOROSAMENTE todas as alergias alimentares (NUNCA prescreva alimentos alergênicos do paciente).
+        2. Respeite as restrições alimentares (ex: se for intolerante a lactose, vegetariano, vegano, etc.).
+        3. Adeque as opções ao objetivo (perda de peso, ganho de massa, controle de diabetes, etc.).
+        4. O cardápio deve ser balanceado, nutritivo, realista e fácil de pegar.
+        
+        REGRAS DE FORMATAÇÃO E ESTRUTURA:
+        - O plano deve cobrir os 7 dias da semana: segunda, terca, quarta, quinta, sexta, sabado, domingo.
+        - Para cada dia, você deve fornecer refeições para 5 momentos: cafe_manha, lanche_manha, almoco, lanche_tarde e jantar.
+        - Para cada refeição, forneça EXATAMENTE 5 opções/linhas de alimentos. Nem mais, nem menos. Preencha todos os 5 campos com alimentos recomendados ou opções alternativas.
+        - Não retorne nenhuma explicação antes ou depois do JSON. A resposta deve ser EXATAMENTE um objeto JSON válido correspondente ao schema solicitado.
+      `;
+
+      const mealSchema = {
+        type: "object",
+        properties: {
+          cafe_manha: { type: "array", items: { type: "string" }, description: "Exatamente 5 opções/itens recomendados para o café da manhã. Exemplo: '1 copo de suco verde', '2 ovos mexidos', '1 fatia de pão integral'." },
+          lanche_manha: { type: "array", items: { type: "string" }, description: "Exatamente 5 opções/itens recomendados para o lanche da manhã." },
+          almoco: { type: "array", items: { type: "string" }, description: "Exatamente 5 opções/itens recomendados para o almoço." },
+          lanche_tarde: { type: "array", items: { type: "string" }, description: "Exatamente 5 opções/itens recomendados para o lanche da tarde." },
+          jantar: { type: "array", items: { type: "string" }, description: "Exatamente 5 opções/itens recomendados para o jantar." }
+        },
+        required: ["cafe_manha", "lanche_manha", "almoco", "lanche_tarde", "jantar"]
+      };
+
+      const responseSchema = {
+        type: "object",
+        properties: {
+          dias: {
+            type: "object",
+            properties: {
+              segunda: mealSchema,
+              terca: mealSchema,
+              quarta: mealSchema,
+              quinta: mealSchema,
+              sexta: mealSchema,
+              sabado: mealSchema,
+              domingo: mealSchema
+            },
+            required: ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"]
+          }
+        },
+        required: ["dias"]
+      };
+
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: responseSchema as any,
+          temperature: 0.2
+        }
+      });
+
+      const result = await model.generateContent(prompt);
+      const responseText = result.response.text();
+      
+      const parsedPlan = JSON.parse(responseText) as PlanConteudo;
+      
+      // Valida e corrige a estrutura
+      DIAS_CHAVES.forEach(dia => {
+        if (!parsedPlan.dias[dia]) {
+          parsedPlan.dias[dia] = {
+            cafe_manha: ['', '', '', '', ''],
+            lanche_manha: ['', '', '', '', ''],
+            almoco: ['', '', '', '', ''],
+            lanche_tarde: ['', '', '', '', ''],
+            jantar: ['', '', '', '', '']
+          };
+        } else {
+          REFEICOES_INFO.forEach(ref => {
+            const arr = parsedPlan.dias[dia][ref.key];
+            if (!Array.isArray(arr)) {
+              parsedPlan.dias[dia][ref.key] = ['', '', '', '', ''];
+            } else if (arr.length < 5) {
+              while (parsedPlan.dias[dia][ref.key].length < 5) {
+                parsedPlan.dias[dia][ref.key].push('');
+              }
+            } else if (arr.length > 5) {
+              parsedPlan.dias[dia][ref.key] = arr.slice(0, 5);
+            }
+          });
+        }
+      });
+
+      setCurrentPlan(parsedPlan);
+      if (!isInsideForm) {
+        setEditingPlanId(null);
+      }
+      setActiveDay('segunda');
+      setIsEditing(true);
+      
+    } catch (err: any) {
+      console.error('Erro na geração da IA:', err);
+      alert('Ocorreu um erro ao gerar o plano com a I.A.: ' + err.message);
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   // Geração de formato WhatsApp para o plano estruturado
   const handleSendWhatsApp = (plan: PlanConteudo) => {
@@ -271,6 +446,15 @@ export const MealPlanManager: React.FC<MealPlanManagerProps> = ({ patient, onRef
               </h3>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                type="button" 
+                className="btn-ai-secondary" 
+                onClick={() => handleGenerateAI(true)}
+                disabled={loading}
+              >
+                <Sparkles size={14} />
+                <span>Sugerir com I.A.</span>
+              </button>
               <button type="button" className="btn-ghost" onClick={() => { setIsEditing(false); setEditingPlanId(null); }}>
                 Cancelar
               </button>
@@ -347,10 +531,21 @@ export const MealPlanManager: React.FC<MealPlanManagerProps> = ({ patient, onRef
         <div className="meal-plan-history fade-in">
           <div className="history-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
             <h3 style={{ margin: 0, fontSize: '18px', fontWeight: 600 }}>Histórico de Planos Alimentares</h3>
-            <button className="btn-primary flex items-center gap-2" onClick={handleNewPlanClick}>
-              <Plus size={18} />
-              <span>Novo Plano Alimentar</span>
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                type="button" 
+                className="btn-ai flex items-center gap-2" 
+                onClick={() => handleGenerateAI(false)}
+                disabled={loading}
+              >
+                <Sparkles size={16} />
+                <span>Gerar Plano com I.A.</span>
+              </button>
+              <button className="btn-primary flex items-center gap-2" onClick={handleNewPlanClick}>
+                <Plus size={18} />
+                <span>Novo Plano Alimentar</span>
+              </button>
+            </div>
           </div>
 
           {patient.planos_alimentares && patient.planos_alimentares.length > 0 ? (
@@ -599,6 +794,18 @@ export const MealPlanManager: React.FC<MealPlanManagerProps> = ({ patient, onRef
           );
         })()}
       </div>
+
+      {aiLoading && (
+        <div className="ai-loading-overlay">
+          <div className="ai-loading-card">
+            <div className="ai-loading-logo">
+              <Sparkles size={36} />
+            </div>
+            <h4 className="ai-loading-title">Gerando Plano Alimentar</h4>
+            <p className="ai-loading-text">{aiStatusText}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
