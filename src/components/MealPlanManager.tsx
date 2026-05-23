@@ -378,7 +378,26 @@ export const MealPlanManager: React.FC<MealPlanManagerProps> = ({ patient, onRef
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{dataCriacao}</span>
-                          <span style={{ fontSize: '14px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', color: 'var(--text-muted)' }}>▼</span>
+                          <button 
+                            type="button" 
+                            className="btn-action" 
+                            style={{ 
+                              padding: '4px 10px', 
+                              fontSize: '12px', 
+                              border: '1px solid var(--border-color)', 
+                              borderRadius: '6px', 
+                              cursor: 'pointer', 
+                              backgroundColor: isExpanded ? 'var(--border-color)' : 'transparent',
+                              color: 'var(--text-main)',
+                              fontWeight: 500,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                          >
+                            <span>{isExpanded ? 'Recolher' : 'Visualizar / Editar'}</span>
+                            <span style={{ fontSize: '10px', transition: 'transform 0.2s', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block' }}>▼</span>
+                          </button>
                         </div>
                       </div>
 
